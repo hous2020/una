@@ -152,3 +152,56 @@ CORS_ALLOW_CREDENTIALS = True
 #     "http://localhost:5173",  # URL de développement frontend
 #     "http://127.0.0.1:5173",
 # ]
+
+# Configuration Email
+# Backend SMTP (les identifiants proviennent de la base au moment de l'envoi)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+# Ne pas stocker d'identifiants ici; ils sont lus depuis ContactLaboratoire
+EMAIL_HOST_USER = None
+EMAIL_HOST_PASSWORD = None
+DEFAULT_FROM_EMAIL = 'no-reply@localhost'
+
+# Configuration du logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'django.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'api': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

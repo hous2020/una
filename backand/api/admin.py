@@ -15,7 +15,8 @@ from .models import (
     RechercheChercheur, RecherchePhase, RechercheChronologie,
     RecherchePublication, RecherchePublicationCitation,
     RecherchePublicationMotCle, RechercheRealisation, RechercheLaboratoire,
-    RechercheObjectif, RecherchePartenaire, CandidatureParcours
+    RechercheObjectif, RecherchePartenaire, CandidatureParcours,
+    ContactLaboratoire, HoraireLaboratoire, MessageContact,
 )
 
 # Configuration des groupes d'administration
@@ -309,9 +310,9 @@ class LaboratoireTypeNewAdmin(admin.ModelAdmin):
 
 @admin.register(Recherche)
 class RechercheAdmin(admin.ModelAdmin):
-    list_display = ('titre', 'statu', 'date_debut', 'date_fin_prevue')
-    search_fields = ('titre',)
-    list_filter = ('statu',)
+    list_display = ('titre', 'statu', 'domaine_recherche', 'date_debut', 'date_fin_prevue', 'progression_temporelle_display')
+    search_fields = ('titre', 'description', 'mots_cles')
+    list_filter = ('statu', 'source_financement', 'domaine_recherche', 'date_debut')
     inlines = [
         RechercheChercheurInline,
         RechercheChronologieInline,
@@ -323,7 +324,7 @@ class RechercheAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Informations générales', {
-            'fields': ('titre', 'description', 'statu')
+            'fields': ('titre', 'description', 'statu', 'domaine_recherche')
         }),
         ('Calendrier', {
             'fields': ('date_debut', 'date_fin_prevue', 'date_fin_reelle')
@@ -331,10 +332,97 @@ class RechercheAdmin(admin.ModelAdmin):
         ('Financement', {
             'fields': ('budget_total', 'source_financement')
         }),
-        ('Métadonnees', {
-            'fields': ('mots_cles', 'domaine_recherche')
+        ('Métadonnées', {
+            'fields': ('mots_cles',),
+            'classes': ['collapse']
         })
     )
+    
+    readonly_fields = ('progression_temporelle_display', 'duree_prevue_display', 'duree_reelle_display')
+    
+    def progression_temporelle_display(self, obj):
+        """Affiche la progression temporelle avec barre de progression"""
+        progression = obj.progression_temporelle
+        
+        if progression == 0:
+            couleur = '#6c757d'  # Gris
+            statut = 'Non commencé'
+        elif progression < 50:
+            couleur = '#17a2b8'  # Bleu
+            statut = 'En début'
+        elif progression < 80:
+            couleur = '#ffc107'  # Jaune
+            statut = 'En cours'
+        elif progression < 100:
+            couleur = '#fd7e14'  # Orange
+            statut = 'Bientôt fini'
+        else:
+            couleur = '#28a745'  # Vert
+            statut = 'Terminé'
+        
+        return format_html(
+            '<div style="width: 100px; background: #e9ecef; border-radius: 10px; overflow: hidden;">' +
+            '<div style="width: {}%; background: {}; height: 20px; text-align: center; line-height: 20px; color: white; font-size: 11px; font-weight: bold;">' +
+            '{}%</div></div>' +
+            '<small style="color: {}; font-weight: bold;">{}</small>',
+            progression, couleur, int(progression), couleur, statut
+        )
+    progression_temporelle_display.short_description = "Progression"
+    
+    def duree_prevue_display(self, obj):
+        """Affiche la durée prévue de manière lisible"""
+        duree = obj.duree_prevue
+        if duree is not None:
+            if duree < 30:
+                return f"{duree} jours"
+            elif duree < 365:
+                mois = duree // 30
+                jours = duree % 30
+                return f"{mois} mois, {jours} jours"
+            else:
+                annees = duree // 365
+                mois = (duree % 365) // 30
+                return f"{annees} an(s), {mois} mois"
+        return "Non définie"
+    duree_prevue_display.short_description = "Durée prévue"
+    
+    def duree_reelle_display(self, obj):
+        """Affiche la durée réelle de manière lisible"""
+        duree = obj.duree_reelle
+        if duree is not None:
+            if duree < 30:
+                return f"{duree} jours"
+            elif duree < 365:
+                mois = duree // 30
+                jours = duree % 30
+                return f"{mois} mois, {jours} jours"
+            else:
+                annees = duree // 365
+                mois = (duree % 365) // 30
+                return f"{annees} an(s), {mois} mois"
+        return "Non terminée"
+    duree_reelle_display.short_description = "Durée réelle"
+    
+    actions = ['marquer_en_cours', 'marquer_termine', 'exporter_recherches']
+    
+    def marquer_en_cours(self, request, queryset):
+        """Action pour marquer les recherches comme en cours"""
+        queryset.update(statu='En cours')
+        self.message_user(request, f"{queryset.count()} recherche(s) marquée(s) comme en cours.")
+    marquer_en_cours.short_description = "Marquer comme en cours"
+    
+    def marquer_termine(self, request, queryset):
+        """Action pour marquer les recherches comme terminées"""
+        from datetime import date
+        queryset.update(statu='Terminer', date_fin_reelle=date.today())
+        self.message_user(request, f"{queryset.count()} recherche(s) marquée(s) comme terminée(s).")
+    marquer_termine.short_description = "Marquer comme terminé"
+    
+    def exporter_recherches(self, request, queryset):
+        """Action pour exporter les recherches sélectionnées"""
+        # Ici vous pourriez implémenter l'export CSV ou PDF
+        self.message_user(request, f"Export de {queryset.count()} recherche(s) en préparation...")
+    exporter_recherches.short_description = "Éxporter les recherches sélectionnées"
 
 # Suppression des admins redondants maintenant gérés par RechercheAdmin
 # @admin.register(RechercheChercheur)
@@ -576,6 +664,46 @@ class CandidatureParcoursAdmin(admin.ModelAdmin):
             )
         return "Pas de diplôme"
     diplome_obtenu_link.short_description = "Lien Diplôme"
+
+
+# ===================== ADMIN CONTACT =====================
+@admin.register(ContactLaboratoire)
+class ContactLaboratoireAdmin(admin.ModelAdmin):
+    list_display = ('id_laboratoire', 'type_contact', 'ville', 'pays', 'telephone_principal', 'email_principal', 'est_actif')
+    list_filter = ('type_contact', 'est_actif', 'pays', 'ville')
+    search_fields = ('id_laboratoire__nom', 'ville', 'pays', 'nom_contact', 'adresse_complete', 'email_principal', 'telephone_principal')
+
+
+@admin.register(HoraireLaboratoire)
+class HoraireLaboratoireAdmin(admin.ModelAdmin):
+    list_display = ('contact_laboratoire', 'jour_semaine', 'heure_ouverture', 'heure_fermeture', 'est_ferme')
+    list_filter = ('jour_semaine', 'est_ferme')
+    search_fields = ('contact_laboratoire__id_laboratoire__nom', 'notes')
+
+
+@admin.register(MessageContact)
+class MessageContactAdmin(admin.ModelAdmin):
+    list_display = ('nom_complet_expediteur', 'id_laboratoire', 'email_expediteur', 'sujet_message', 'priorite', 'statut_message', 'est_traite', 'date_envoi')
+    list_filter = ('priorite', 'statut_message', 'est_traite', 'date_envoi')
+    search_fields = ('prenom_expediteur', 'nom_expediteur', 'email_expediteur', 'sujet_message', 'contenu_message')
+
+    def save_model(self, request, obj, form, change):
+        """
+        À l'enregistrement d'une réponse admin, envoie l'email à l'expéditeur
+        si un contenu de réponse est présent.
+        """
+        super().save_model(request, obj, form, change)
+
+        # Envoyer la réponse admin si le champ est rempli
+        try:
+            from .services import EmailService
+
+            a_une_reponse = bool(obj.reponse_admin and obj.reponse_admin.strip())
+            if a_une_reponse:
+                EmailService.envoyer_reponse_admin(obj)
+        except Exception:
+            # On évite de bloquer l'admin en cas d'erreur; les logs capteront le détail
+            pass
 
 
 # Configuration de l'interface d'administration

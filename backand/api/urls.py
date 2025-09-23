@@ -6,6 +6,9 @@ from .views import (
     CandidatureParcoursViewSet,
     LaboratoireViewSet,
     RecherchePublicationViewSet,
+    ContactLaboratoireViewSet,
+    HoraireLaboratoireViewSet,
+    MessageContactViewSet,
 )
 
 # Création du routeur pour l'API
@@ -15,6 +18,9 @@ routeur.register(r'laboratoires', LaboratoireViewSet)
 routeur.register(r'parcours', LaboratoireParcourViewSet)
 routeur.register(r'candidatures', CandidatureParcoursViewSet)
 routeur.register(r'publications', RecherchePublicationViewSet)
+routeur.register(r'contacts', ContactLaboratoireViewSet)
+routeur.register(r'horaires', HoraireLaboratoireViewSet)
+routeur.register(r'messages', MessageContactViewSet)
 
 urlpatterns = [
     path('', include(routeur.urls)),

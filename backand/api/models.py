@@ -367,18 +367,72 @@ class Recherche(models.Model):
         ("Suspendu", "Suspendu"),
         ("Annuler", "Annuler"),
     ]
+    
+    SOURCE_FINANCEMENT_CHOICES = [
+        ("Public", "Financement public"),
+        ("Privé", "Financement privé"),
+        ("Mixte", "Financement mixte"),
+        ("International", "Financement international"),
+        ("Autofinancement", "Autofinancement"),
+    ]
+    
     titre = models.CharField(max_length=255)
     description = models.TextField()
     statu = models.CharField(max_length=20, choices=STATUT_CHOICES, default="Planifier")
+    domaine_recherche = models.CharField(max_length=255, null=True, blank=True, verbose_name="Domaine de recherche")
+    mots_cles = models.TextField(null=True, blank=True, verbose_name="Mots-clés", help_text="Séparez les mots-clés par des virgules")
     date_debut = models.DateField()
     date_fin_prevue = models.DateField(null=True, blank=True)
     date_fin_reelle = models.DateField(null=True, blank=True)
     budget_total = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    source_financement = models.CharField(max_length=50, choices=SOURCE_FINANCEMENT_CHOICES, null=True, blank=True, verbose_name="Source de financement")
     creer_le = models.DateTimeField(auto_now_add=True)
     mise_a_jour_le = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.titre
+    
+    @property
+    def progression_temporelle(self):
+        """Calcule la progression temporelle en pourcentage"""
+        from datetime import date
+        
+        if not self.date_debut:
+            return 0
+        
+        today = date.today()
+        date_fin = self.date_fin_reelle or self.date_fin_prevue
+        
+        if not date_fin:
+            return 0
+        
+        if today < self.date_debut:
+            return 0
+        
+        if today >= date_fin:
+            return 100
+        
+        duree_totale = (date_fin - self.date_debut).days
+        duree_ecoulee = (today - self.date_debut).days
+        
+        if duree_totale <= 0:
+            return 100
+        
+        return min(100, max(0, (duree_ecoulee / duree_totale) * 100))
+    
+    @property
+    def duree_prevue(self):
+        """Calcule la durée prévue en jours"""
+        if self.date_debut and self.date_fin_prevue:
+            return (self.date_fin_prevue - self.date_debut).days
+        return None
+    
+    @property
+    def duree_reelle(self):
+        """Calcule la durée réelle en jours"""
+        if self.date_debut and self.date_fin_reelle:
+            return (self.date_fin_reelle - self.date_debut).days
+        return None
 
 
 class RechercheChercheur(models.Model):
@@ -649,3 +703,185 @@ class CandidatureParcours(models.Model):
         return today.year - self.date_naissance.year - (
             (today.month, today.day) < (self.date_naissance.month, self.date_naissance.day)
         )
+
+
+class ContactLaboratoire(models.Model):
+    """
+    Modèle pour gérer les informations de contact des laboratoires
+    """
+    TYPE_CONTACT_CHOICES = [
+        ("principal", "Contact principal"),
+        ("direction", "Direction"),
+        ("administration", "Administration"),
+        ("recherche", "Service recherche"),
+        ("partenariats", "Partenariats"),
+        ("communication", "Communication"),
+    ]
+    
+    id_laboratoire = models.ForeignKey(
+        Laboratoire, 
+        on_delete=models.CASCADE, 
+        verbose_name="Laboratoire"
+    )
+    type_contact = models.CharField(
+        max_length=30, 
+        choices=TYPE_CONTACT_CHOICES,
+        default="principal", 
+        verbose_name="Type de contact"
+    )
+    
+    # Informations d'adresse
+    adresse_complete = models.CharField(max_length=255, verbose_name="Adresse complète")
+    ville = models.CharField(max_length=100, verbose_name="Ville")
+    code_postal = models.CharField(max_length=20, verbose_name="Code postal", null=True, blank=True)
+    pays = models.CharField(max_length=100, verbose_name="Pays")
+    
+    # Informations de contact
+    telephone_principal = models.CharField(max_length=20, verbose_name="Téléphone principal", null=True, blank=True)
+    email_principal = models.EmailField(verbose_name="Email principal", null=True, blank=True)
+    mot_de_passe_email = models.CharField(max_length=255, verbose_name="Mot de passe email", null=True, blank=True)
+    site_web = models.URLField(verbose_name="Site web", null=True, blank=True)
+    
+    # Statut
+    est_actif = models.BooleanField(default=True, verbose_name="Contact actif")
+    
+    # Métadonnées
+    creer_le = models.DateTimeField(auto_now_add=True)
+    mise_a_jour_le = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Contact laboratoire"
+        verbose_name_plural = "Contacts laboratoires"
+    
+    def __str__(self):
+        return f"{self.id_laboratoire.nom} - {self.get_type_contact_display()}"
+
+
+class HoraireLaboratoire(models.Model):
+    """
+    Modèle pour gérer les horaires d'ouverture des laboratoires
+    """
+    JOUR_SEMAINE_CHOICES = [
+        (1, "Lundi"),
+        (2, "Mardi"),
+        (3, "Mercredi"),
+        (4, "Jeudi"),
+        (5, "Vendredi"),
+        (6, "Samedi"),
+        (7, "Dimanche"),
+    ]
+    
+    contact_laboratoire = models.ForeignKey(
+        ContactLaboratoire, 
+        on_delete=models.CASCADE, 
+        verbose_name="Contact laboratoire"
+    )
+    jour_semaine = models.IntegerField(
+        choices=JOUR_SEMAINE_CHOICES, 
+        verbose_name="Jour de la semaine"
+    )
+    heure_ouverture = models.TimeField(verbose_name="Heure d'ouverture", null=True, blank=True)
+    heure_fermeture = models.TimeField(verbose_name="Heure de fermeture", null=True, blank=True)
+    est_ferme = models.BooleanField(default=False, verbose_name="Fermé ce jour")
+    notes = models.CharField(max_length=255, verbose_name="Notes", null=True, blank=True)
+    
+    # Métadonnées
+    creer_le = models.DateTimeField(auto_now_add=True)
+    mise_a_jour_le = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Horaire laboratoire"
+        verbose_name_plural = "Horaires laboratoires"
+        ordering = ['contact_laboratoire', 'jour_semaine']
+    
+    def __str__(self):
+        if self.est_ferme:
+            return f"{self.contact_laboratoire} - {self.jour_semaine}: Fermé"
+        return f"{self.contact_laboratoire} - {self.jour_semaine}: {self.heure_ouverture}-{self.heure_fermeture}"
+
+
+class MessageContact(models.Model):
+    """
+    Modèle pour gérer les messages de contact envoyés aux laboratoires
+    """
+    PRIORITE_CHOICES = [
+        ("basse", "Basse"),
+        ("normale", "Normale"),
+        ("haute", "Haute"),
+        ("urgente", "Urgente"),
+    ]
+    
+    STATUT_MESSAGE_CHOICES = [
+        ("nouveau", "Nouveau message"),
+        ("en_cours", "En cours de traitement"),
+        ("traite", "Traité"),
+        ("archive", "Archivé"),
+    ]
+    
+    # Référence au laboratoire
+    id_laboratoire = models.ForeignKey(
+        Laboratoire, 
+        on_delete=models.CASCADE, 
+        verbose_name="Laboratoire destinataire"
+    )
+    
+    # Informations sur l'expéditeur
+    prenom_expediteur = models.CharField(max_length=100, verbose_name="Prénom de l'expéditeur")
+    nom_expediteur = models.CharField(max_length=100, verbose_name="Nom de l'expéditeur")
+    email_expediteur = models.EmailField(verbose_name="Email de l'expéditeur")
+    organisation_expediteur = models.CharField(
+        max_length=255, 
+        verbose_name="Organisation de l'expéditeur", 
+        null=True, blank=True
+    )
+    
+    # Contenu du message
+    sujet_message = models.CharField(max_length=255, verbose_name="Sujet du message")
+    contenu_message = models.TextField(verbose_name="Contenu du message")
+    
+    # Gestion administrative
+    statut_message = models.CharField(
+        max_length=20, 
+        choices=STATUT_MESSAGE_CHOICES, 
+        default="nouveau", 
+        verbose_name="Statut du message"
+    )
+    priorite = models.CharField(
+        max_length=20, 
+        choices=PRIORITE_CHOICES, 
+        default="normale", 
+        verbose_name="Priorité"
+    )
+    
+    # Réponse administrative
+    reponse_admin = models.TextField(
+        verbose_name="Réponse administrative", 
+        null=True, blank=True
+    )
+    responsable_reponse = models.CharField(
+        max_length=150, 
+        verbose_name="Responsable de la réponse", 
+        null=True, blank=True
+    )
+    date_reponse = models.DateTimeField(
+        verbose_name="Date de réponse", 
+        null=True, blank=True
+    )
+    
+    # Statuts et dates
+    est_traite = models.BooleanField(default=False, verbose_name="Message traité")
+    date_envoi = models.DateTimeField(auto_now_add=True, verbose_name="Date d'envoi")
+    date_derniere_modification = models.DateTimeField(auto_now=True, verbose_name="Dernière modification")
+    
+    class Meta:
+        verbose_name = "Message de contact"
+        verbose_name_plural = "Messages de contact"
+        ordering = ['-date_envoi']
+    
+    def __str__(self):
+        return f"{self.nom_complet_expediteur} - {self.sujet_message}"
+    
+    @property
+    def nom_complet_expediteur(self):
+        """Retourne le nom complet de l'expéditeur"""
+        return f"{self.prenom_expediteur} {self.nom_expediteur}"

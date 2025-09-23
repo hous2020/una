@@ -6,7 +6,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import (
     Chercheur, LaboratoireParcour, CandidatureParcours, Laboratoire,
-    RecherchePublication, RecherchePublicationMotCle, RecherchePublicationCitation,
+    RecherchePublication, RecherchePublicationMotCle, RecherchePublicationCitation, ChercheurLaboratoire, ChercheurPoste, RechercheLaboratoire, RechercheChercheur,
+    ContactLaboratoire, HoraireLaboratoire, MessageContact,
 )
 from .serializers.chercheur_serializers import ChercheurSerializer, ChercheurListSerializer
 from .serializers.laboratoire_serializers import (
@@ -18,6 +19,20 @@ from .serializers.publication_serializers import (
     RecherchePublicationListSerializer,
     RecherchePublicationDetailSerializer,
 )
+from .serializers.contact_serializers import (
+    ContactLaboratoireSerializer,
+    ContactLaboratoireListSerializer,
+    ContactLaboratoireCreateSerializer,
+    HoraireLaboratoireSerializer,
+    HoraireLaboratoireCreateSerializer,
+    MessageContactSerializer,
+    MessageContactListSerializer,
+    MessageContactCreateSerializer,
+)
+from .services import EmailService
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ChercheurViewSet(viewsets.ReadOnlyModelViewSet):
@@ -28,6 +43,34 @@ class ChercheurViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [AllowAny]
     filter_backends = [filters.SearchFilter]
     search_fields = ['nom', 'prenom']
+
+    def get_queryset(self):
+        """
+        Surcharge de la méthode pour filtrer les chercheurs par laboratoire.
+        """
+        queryset = super().get_queryset()
+        laboratoire_id = self.request.query_params.get('laboratoire_id')
+
+        if laboratoire_id:
+            try:
+                # Récupérer les ID des ChercheurPoste liés au laboratoire
+                chercheur_poste_ids = ChercheurLaboratoire.objects.filter(
+                    id_laboratoire_id=laboratoire_id
+                ).values_list('id_chercheur_poste_id', flat=True)
+
+                # Récupérer les ID des Chercheurs liés à ces ChercheurPoste
+                chercheur_ids = ChercheurPoste.objects.filter(
+                    id__in=chercheur_poste_ids
+                ).values_list('id_chercheur_id', flat=True)
+
+                # Filtrer le queryset des chercheurs
+                queryset = queryset.filter(id__in=chercheur_ids)
+
+            except (ValueError, TypeError):
+                # En cas d'ID de laboratoire invalide, ne rien faire
+                pass
+
+        return queryset
     
     def get_serializer_class(self):
         """
@@ -294,6 +337,34 @@ class RecherchePublicationViewSet(viewsets.ReadOnlyModelViewSet):
         if recherche_id and recherche_id.isdigit():
             qs = qs.filter(id_recherche_id=int(recherche_id))
 
+        # Filtre par laboratoire
+        laboratoire_id = self.request.query_params.get('laboratoire_id')
+        if laboratoire_id and laboratoire_id.isdigit():
+            lab_id_int = int(laboratoire_id)
+
+            # A) Recherches liées directement au laboratoire via RechercheLaboratoire
+            recherche_ids_direct = RechercheLaboratoire.objects.filter(
+                id_laboratoire_domaine__id_laboratoire_id=lab_id_int
+            ).values_list('id_recherche_id', flat=True)
+
+            # B) Recherches où des chercheurs du laboratoire participent via RechercheChercheur
+            chercheur_ids = ChercheurPoste.objects.filter(
+                id__in=ChercheurLaboratoire.objects.filter(
+                    id_laboratoire_id=lab_id_int
+                ).values_list('id_chercheur_poste_id', flat=True)
+            ).values_list('id_chercheur_id', flat=True)
+
+            recherche_ids_via_chercheurs = RechercheChercheur.objects.filter(
+                id_chercheur_id__in=chercheur_ids
+            ).values_list('id_recherche_id', flat=True)
+
+            # Union des deux ensembles
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(id_recherche_id__in=recherche_ids_direct) |
+                Q(id_recherche_id__in=recherche_ids_via_chercheurs)
+            )
+
         # Présence de fichier PDF
         has_pdf = self.request.query_params.get('has_pdf')
         if has_pdf in ['1', 'true', 'True']:
@@ -312,3 +383,158 @@ class RecherchePublicationViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.order_by('-date_publication')
 
         return qs
+
+
+class ContactLaboratoireViewSet(viewsets.ModelViewSet):
+    """
+    API contacts du laboratoire
+    """
+    queryset = ContactLaboratoire.objects.all()
+    permission_classes = [AllowAny]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['id_laboratoire__nom', 'ville', 'pays', 'nom_contact', 'adresse_complete']
+
+    def get_serializer_class(self):
+        if self.action in ['list']:
+            return ContactLaboratoireListSerializer
+        if self.action in ['create']:
+            return ContactLaboratoireCreateSerializer
+        return ContactLaboratoireSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        laboratoire_id = self.request.query_params.get('laboratoire_id')
+        type_contact = self.request.query_params.get('type_contact')
+        if laboratoire_id and laboratoire_id.isdigit():
+            qs = qs.filter(id_laboratoire_id=int(laboratoire_id))
+        if type_contact:
+            qs = qs.filter(type_contact=type_contact)
+        return qs.order_by('-est_actif', 'type_contact')
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx.update({'request': self.request})
+        return ctx
+
+    @action(detail=True, methods=['get'])
+    def horaires(self, request, pk=None):
+        contact = self.get_object()
+        horaires = HoraireLaboratoire.objects.filter(contact_laboratoire=contact)
+        ser = HoraireLaboratoireSerializer(horaires, many=True, context={'request': request})
+        return Response(ser.data)
+
+
+class HoraireLaboratoireViewSet(viewsets.ModelViewSet):
+    """
+    API horaires du laboratoire
+    """
+    queryset = HoraireLaboratoire.objects.all()
+    permission_classes = [AllowAny]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['notes', 'contact_laboratoire__id_laboratoire__nom']
+
+    def get_serializer_class(self):
+        if self.action in ['create']:
+            return HoraireLaboratoireCreateSerializer
+        return HoraireLaboratoireSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        contact_id = self.request.query_params.get('contact_id')
+        jour = self.request.query_params.get('jour')
+        ouvert_seulement = self.request.query_params.get('ouvert_seulement')
+        if contact_id and contact_id.isdigit():
+            qs = qs.filter(contact_laboratoire_id=int(contact_id))
+        if jour and jour.isdigit():
+            qs = qs.filter(jour_semaine=int(jour))
+        if ouvert_seulement in ['1', 'true', 'True']:
+            qs = qs.filter(est_ferme=False)
+        return qs.order_by('jour_semaine')
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx.update({'request': self.request})
+        return ctx
+
+
+class MessageContactViewSet(viewsets.ModelViewSet):
+    """
+    API messages de contact
+    """
+    queryset = MessageContact.objects.all()
+    permission_classes = [AllowAny]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['prenom_expediteur', 'nom_expediteur', 'email_expediteur', 'sujet_message', 'contenu_message']
+
+    def get_serializer_class(self):
+        if self.action in ['list']:
+            return MessageContactListSerializer
+        if self.action in ['create']:
+            return MessageContactCreateSerializer
+        return MessageContactSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        laboratoire_id = self.request.query_params.get('laboratoire_id')
+        statut = self.request.query_params.get('statut')
+        priorite = self.request.query_params.get('priorite')
+        traite = self.request.query_params.get('traite')
+        date_debut = self.request.query_params.get('date_debut')
+        date_fin = self.request.query_params.get('date_fin')
+
+        if laboratoire_id and laboratoire_id.isdigit():
+            qs = qs.filter(id_laboratoire_id=int(laboratoire_id))
+        if statut:
+            qs = qs.filter(statut_message=statut)
+        if priorite:
+            qs = qs.filter(priorite=priorite)
+        if traite in ['1', 'true', 'True']:
+            qs = qs.filter(est_traite=True)
+        if date_debut:
+            qs = qs.filter(date_envoi__date__gte=date_debut)
+        if date_fin:
+            qs = qs.filter(date_envoi__date__lte=date_fin)
+        return qs.order_by('-date_envoi')
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx.update({'request': self.request})
+        return ctx
+    
+    def perform_create(self, serializer):
+        """Surcharge pour envoyer les emails après création du message"""
+        # Sauvegarder le message
+        message = serializer.save()
+        
+        # Envoyer les notifications par email
+        try:
+            # Email de notification au laboratoire
+            notif_ok = EmailService.envoyer_notification_nouveau_message(message)
+            if notif_ok:
+                logger.info(f"Notification envoyée au laboratoire pour le message {message.id}")
+            else:
+                logger.warning(f"Notification NON envoyée (config manquante) pour le message {message.id}")
+            
+            # Email de confirmation à l'expéditeur
+            conf_ok = EmailService.envoyer_confirmation_expediteur(message)
+            if conf_ok:
+                logger.info(f"Confirmation envoyée à l'expéditeur pour le message {message.id}")
+            else:
+                logger.warning(f"Confirmation NON envoyée (config manquante) pour le message {message.id}")
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de l'envoi des emails pour le message {message.id}: {str(e)}")
+            # Ne pas faire échouer la création du message si l'email échoue
+        
+        return message
+
+    @action(detail=True, methods=['patch'])
+    def marquer_traite(self, request, pk=None):
+        message = self.get_object()
+        message.est_traite = True
+        message.statut_message = 'traite'
+        message.reponse_admin = request.data.get('reponse_admin', message.reponse_admin)
+        message.responsable_reponse = request.data.get('responsable_reponse', message.responsable_reponse)
+        message.save(update_fields=['est_traite', 'statut_message', 'reponse_admin', 'responsable_reponse'])
+        ser = MessageContactSerializer(message, context={'request': request})
+        return Response(ser.data)

@@ -3,6 +3,7 @@ from api.models import (
     RecherchePublication,
     RecherchePublicationMotCle,
     RecherchePublicationCitation,
+    RechercheChercheur,
 )
 
 
@@ -22,12 +23,26 @@ class PublicationCitationSerializer(serializers.ModelSerializer):
         fields = ["id", "citation"]
 
 
+class RechercheChercheurPublicationSerializer(serializers.ModelSerializer):
+    """Sérialiseur pour les chercheurs sur une publication"""
+    nom_complet = serializers.SerializerMethodField()
+    role = serializers.CharField(source='role_equipe')
+
+    class Meta:
+        model = RechercheChercheur
+        fields = ['nom_complet', 'role']
+
+    def get_nom_complet(self, obj):
+        return f"{obj.id_chercheur.prenom} {obj.id_chercheur.nom}"
+
+
 class RecherchePublicationListSerializer(serializers.ModelSerializer):
     """Sérialiseur liste des publications"""
 
     fichier_url = serializers.SerializerMethodField()
     recherche_titre = serializers.CharField(source="id_recherche.titre", read_only=True)
     citations_count = serializers.SerializerMethodField()
+    chercheurs = serializers.SerializerMethodField()
 
     class Meta:
         model = RecherchePublication
@@ -42,6 +57,7 @@ class RecherchePublicationListSerializer(serializers.ModelSerializer):
             "fichier_url",
             "recherche_titre",
             "citations_count",
+            "chercheurs",
         ]
 
     def get_fichier_url(self, obj):
@@ -54,6 +70,10 @@ class RecherchePublicationListSerializer(serializers.ModelSerializer):
 
     def get_citations_count(self, obj):
         return RecherchePublicationCitation.objects.filter(id_recherche_publication=obj).count()
+
+    def get_chercheurs(self, obj):
+        chercheurs_associes = RechercheChercheur.objects.filter(id_recherche=obj.id_recherche)
+        return RechercheChercheurPublicationSerializer(chercheurs_associes, many=True).data
 
 
 class RecherchePublicationDetailSerializer(serializers.ModelSerializer):
