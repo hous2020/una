@@ -2,66 +2,129 @@
 
 ## Vue d'ensemble
 
-UNA est une application web complète pour la gestion d'un laboratoire universitaire, comprenant la gestion des chercheurs, des parcours de formation, et un système de candidature dynamique. Le projet utilise Django REST Framework pour le backend et React avec TypeScript pour le frontend.
+UNA est une application web complète pour la gestion d'un laboratoire universitaire, comprenant la gestion des chercheurs, des parcours de formation, des publications de recherche, des partenariats, et un système de candidature dynamique. Le projet utilise Django REST Framework pour le backend et React avec TypeScript pour le frontend.
 
 ## 🚀 Fonctionnalités Principales
 
 ### 1. Gestion des Chercheurs
 - **Affichage dynamique de l'équipe** : Interface responsive avec données en temps réel
 - **Profils détaillés** : Biographies, domaines d'expertise, publications, recherches actuelles
-- **Réseaux sociaux** : Intégration des profils professionnels
+- **Réseaux sociaux** : Intégration des profils professionnels (LinkedIn, ResearchGate, ORCID, etc.)
 - **Recherche et filtrage** : Recherche par nom, poste ou domaine d'expertise
+- **Gestion des diplômes** : Historique académique des chercheurs
 
-### 2. Gestion des Parcours de Formation
+### 2. Gestion des Laboratoires
+- **Informations complètes** : Nom, logo, UFR, type de laboratoire
+- **Présentation** : Descriptions, missions, budgets annuels
+- **Partenariats** : Gestion des collaborations académiques et industrielles
+- **Actualités** : Système de news et publications du laboratoire
+
+### 3. Gestion des Parcours de Formation
 - **Parcours dynamiques** : Liste des formations liées au laboratoire
 - **Informations détaillées** : Spécialisations, débouchés, conditions d'admission
 - **États de gestion** : Loading, erreur, données vides avec interfaces appropriées
+- **Gestion des étudiants** : Nombre maximum, durée de formation
 
-### 3. Système de Candidature Dynamique 🆕
+### 4. Système de Recherche et Publications
+- **Gestion des projets** : Suivi des recherches en cours, planifiées et terminées
+- **Publications scientifiques** : Gestion des articles, DOI, facteur d'impact
+- **Citations** : Suivi des citations et mots-clés
+- **Réalisations** : Documentation des résultats et impacts
+- **Financement** : Gestion des budgets et sources de financement
+
+### 5. Système de Candidature Dynamique 🆕
 - **Formulaire multi-étapes** : Interface progressive en 4 étapes
 - **Validation complète** : Validation en temps réel avec feedback utilisateur
 - **Upload de documents** : Support PDF avec prévisualisation
 - **Intégration backend** : Envoi direct vers l'API Django
 
+### 6. Gestion des Contacts et Communication
+- **Contacts laboratoires** : Informations de contact complètes
+- **Horaires d'ouverture** : Gestion des plannings
+- **Messages de contact** : Système de messagerie avec priorités
+- **Newsletter** : Abonnement et gestion des communications
+
 ## 📁 Structure du Projet
 
 ```
 una/
-├── backand/                    # API Django REST Framework
+├── backand/                           # API Django REST Framework
 │   ├── api/
-│   │   ├── models.py          # Modèles de données
-│   │   ├── serializers/       # Serializers API
-│   │   ├── views.py           # Vues API
-│   │   └── urls.py            # Configuration des URLs
-│   ├── manage.py              # Gestionnaire Django
-│   └── requirements.txt       # Dépendances Python
-├── frontend/                  # Application React TypeScript
+│   │   ├── models.py                  # Modèles de données (25+ modèles)
+│   │   ├── serializers/               # Serializers API
+│   │   │   ├── chercheur_serializers.py
+│   │   │   ├── laboratoire_serializers.py
+│   │   │   ├── publication_serializers.py
+│   │   │   └── contact_serializers.py
+│   │   ├── views.py                   # Vues API (ViewSets)
+│   │   ├── services.py                # Services métier (Email, etc.)
+│   │   ├── admin.py                   # Interface d'administration
+│   │   ├── urls.py                    # Configuration des URLs
+│   │   └── migrations/                # Migrations de base de données
+│   ├── backand/
+│   │   ├── settings.py                # Configuration Django
+│   │   ├── urls.py                    # URLs principales
+│   │   └── wsgi.py                    # Configuration WSGI
+│   ├── manage.py                      # Gestionnaire Django
+│   ├── db.sqlite3                     # Base de données SQLite
+│   └── logs/                          # Fichiers de logs
+├── frontend/                          # Application React TypeScript
 │   ├── src/
-│   │   ├── components/        # Composants React
-│   │   ├── hooks/             # Hooks personnalisés
-│   │   ├── config/            # Configuration API
-│   │   └── pages/             # Pages de l'application
-│   ├── package.json           # Dépendances Node.js
-│   └── vite.config.ts         # Configuration Vite
-└── README.md                  # Documentation principale
+│   │   ├── components/                # Composants React (50+ composants)
+│   │   │   ├── ui/                    # Composants shadcn/ui
+│   │   │   ├── Hero.tsx               # Section héro
+│   │   │   ├── Navigation.tsx         # Navigation principale
+│   │   │   ├── Team.tsx               # Équipe de chercheurs
+│   │   │   ├── Publications.tsx       # Publications
+│   │   │   ├── ApplicationModal.tsx   # Modal de candidature
+│   │   │   └── ...                    # Autres composants
+│   │   ├── pages/                     # Pages de l'application (15 pages)
+│   │   │   ├── Index.tsx              # Page d'accueil
+│   │   │   ├── Team.tsx               # Page équipe
+│   │   │   ├── Research.tsx           # Page recherche
+│   │   │   ├── Publications.tsx       # Page publications
+│   │   │   └── ...                    # Autres pages
+│   │   ├── hooks/                     # Hooks personnalisés (12 hooks)
+│   │   │   ├── useChercheurs.ts       # Hook chercheurs
+│   │   │   ├── useCandidature.ts      # Hook candidatures
+│   │   │   ├── useLaboratoires.ts     # Hook laboratoires
+│   │   │   └── ...                    # Autres hooks
+│   │   ├── config/                    # Configuration
+│   │   │   └── ApiConfig.ts           # Configuration API
+│   │   ├── types/                     # Types TypeScript
+│   │   ├── services/                  # Services API
+│   │   └── constants/                 # Constantes
+│   ├── public/                        # Fichiers statiques
+│   ├── package.json                   # Dépendances Node.js
+│   ├── vite.config.ts                 # Configuration Vite
+│   └── tailwind.config.ts             # Configuration Tailwind
+├── env/                               # Environnement virtuel Python
+└── README.md                          # Documentation principale
 ```
 
 ## 🛠️ Technologies Utilisées
 
 ### Backend
-- **Django 4.x** : Framework web Python
-- **Django REST Framework** : API REST
-- **SQLite/PostgreSQL** : Base de données
-- **Django CORS Headers** : Gestion CORS
+- **Django 5.2.6** : Framework web Python
+- **Django REST Framework 3.16.1** : API REST
+- **SQLite** : Base de données (développement)
+- **Django CORS Headers 4.8.0** : Gestion CORS
+- **Pillow 11.3.0** : Traitement d'images
+- **python-dotenv 1.1.1** : Gestion des variables d'environnement
 
 ### Frontend
-- **React 18** : Bibliothèque UI
-- **TypeScript** : Typage statique
-- **Vite** : Build tool moderne
-- **Tailwind CSS** : Framework CSS
-- **shadcn/ui** : Composants UI
-- **Lucide React** : Icônes
-- **Sonner** : Notifications toast
+- **React 18.3.1** : Bibliothèque UI
+- **TypeScript 5.5.3** : Typage statique
+- **Vite 7.1.4** : Build tool moderne
+- **Tailwind CSS 3.4.11** : Framework CSS
+- **shadcn/ui** : Composants UI (Radix UI primitives)
+- **Lucide React 0.462.0** : Icônes
+- **Sonner 1.5.0** : Notifications toast
+- **React Router DOM 6.26.2** : Routage
+- **React Hook Form 7.53.0** : Gestion des formulaires
+- **Zod 3.23.8** : Validation de schémas
+- **TanStack Query 5.56.2** : Gestion d'état serveur
+- **Recharts 2.12.7** : Graphiques et visualisations
 
 ## 🚀 Installation et Configuration
 
@@ -129,23 +192,60 @@ export const ApiConfig = {
 
 ## 📋 Modèles de Données Principaux
 
-### Chercheur
-- Informations personnelles et professionnelles
-- Relations : Postes, Domaines d'expertise, Réseaux sociaux
-- Publications et recherches actuelles
+### Chercheurs et Équipe
+- **Chercheur** : Informations personnelles et professionnelles
+- **ChercheurDiplome** : Historique académique des chercheurs
+- **ChercheurDomaineExpertise** : Domaines de spécialisation
+- **ChercheurPoste** : Postes et rôles dans le laboratoire
+- **ChercheurReseau** : Réseaux sociaux et contacts professionnels
+- **ChercheurMot** : Messages et citations des chercheurs
 
-### LaboratoireParcour
-- Parcours de formation du laboratoire
-- Spécialisations, débouchés, conditions d'admission
-- Gestion des étudiants et durée de formation
+### Laboratoires et Organisation
+- **Laboratoire** : Informations principales (nom, logo, UFR, type)
+- **TypeLaboratoire** : Classification des types de laboratoires
+- **LaboratoireDomaine** : Domaines de recherche du laboratoire
+- **LaboratoirePresentation** : Présentations et descriptions
+- **LaboratoireMission** : Missions, budgets et objectifs
+- **LaboratoireSlider** : Contenu de présentation par page
 
-### CandidatureParcours 🆕
-- **Informations personnelles** : Nom, prénom, date de naissance, nationalité
-- **Contact** : Téléphone, email, adresse complète
-- **Académique** : Niveau d'étude, établissement, moyenne, année d'obtention
-- **Documents** : CV, lettre de motivation, relevés de notes, diplôme
-- **Projet** : Motivation principale, projet professionnel, expérience recherche
-- **Suivi** : Statut candidature, commentaires admin, note d'évaluation
+### Formations et Parcours
+- **LaboratoireParcour** : Parcours de formation proposés
+- **LaboratoireParcourSpecialisation** : Spécialisations des parcours
+- **LaboratoireParcourDeboucher** : Débouchés professionnels
+- **LaboratoireParcourConditionAdmission** : Conditions d'admission
+
+### Recherche et Publications
+- **Recherche** : Projets de recherche (statut, financement, dates)
+- **RechercheChercheur** : Équipes de recherche et rôles
+- **RecherchePhase** : Phases de développement des projets
+- **RechercheChronologie** : Planning et jalons des projets
+- **RecherchePublication** : Publications scientifiques
+- **RecherchePublicationCitation** : Citations des publications
+- **RecherchePublicationMotCle** : Mots-clés des publications
+- **RechercheRealisation** : Réalisations et impacts
+- **RechercheObjectif** : Objectifs des projets de recherche
+- **RecherchePartenaire** : Partenaires et financements
+
+### Partenariats
+- **Partenaire** : Informations sur les partenaires
+- **LaboratoirePartenaire** : Relations laboratoire-partenaires
+- **RecherchePartenaire** : Collaborations sur les projets
+
+### Candidatures 🆕
+- **CandidatureParcours** : Candidatures aux parcours de formation
+  - **Informations personnelles** : Nom, prénom, date de naissance, nationalité
+  - **Contact** : Téléphone, email, adresse complète
+  - **Académique** : Niveau d'étude, établissement, moyenne, année d'obtention
+  - **Documents** : CV, lettre de motivation, relevés de notes, diplôme
+  - **Projet** : Motivation principale, projet professionnel, expérience recherche
+  - **Suivi** : Statut candidature, commentaires admin, note d'évaluation
+
+### Communication et Contact
+- **ContactLaboratoire** : Informations de contact des laboratoires
+- **HoraireLaboratoire** : Horaires d'ouverture
+- **MessageContact** : Messages envoyés aux laboratoires
+- **LaboratoireNew** : Actualités et news du laboratoire
+- **Type** : Types de contenu et classifications
 
 ## 🎯 Nouvelle Fonctionnalité : Candidature Dynamique
 
@@ -194,6 +294,23 @@ export const ApiConfig = {
 - **Dark/Light mode** : Support des thèmes
 - **Animations** : Transitions fluides avec Tailwind
 
+### Pages Frontend Disponibles
+- **Index** : Page d'accueil avec présentation générale
+- **About** : À propos du laboratoire
+- **Team** : Équipe de chercheurs avec profils détaillés
+- **TeamMemberDetail** : Profil individuel d'un chercheur
+- **Level** : Parcours de formation disponibles
+- **Research** : Projets de recherche
+- **ResearchDetail** : Détails d'un projet de recherche
+- **Publications** : Publications scientifiques
+- **PublicationDetail** : Détail d'une publication
+- **News** : Actualités du laboratoire
+- **NewsDetail** : Détail d'une actualité
+- **Director** : Page du directeur
+- **DeclarationDetail** : Déclarations et documents officiels
+- **Contact** : Informations de contact
+- **NotFound** : Page d'erreur 404
+
 ### Navigation
 - **Progress bar** : Indicateur de progression dans les formulaires
 - **Breadcrumbs** : Navigation contextuelle
@@ -223,9 +340,18 @@ npm run test:e2e
 - `GET /api/chercheurs/` : Liste des chercheurs
 - `GET /api/chercheurs/{id}/` : Détails d'un chercheur
 
+#### Laboratoires
+- `GET /api/laboratoires/` : Liste des laboratoires
+- `GET /api/laboratoires/{id}/` : Détails d'un laboratoire
+- `GET /api/laboratoires/{id}/parcours/` : Parcours d'un laboratoire
+
 #### Parcours
 - `GET /api/parcours/` : Liste des parcours
 - `GET /api/parcours/{id}/` : Détails d'un parcours
+
+#### Publications de Recherche
+- `GET /api/publications/` : Liste des publications
+- `GET /api/publications/{id}/` : Détails d'une publication
 
 #### Candidatures 🆕
 - `POST /api/candidatures/` : Créer une candidature
@@ -233,6 +359,13 @@ npm run test:e2e
 - `GET /api/candidatures/{id}/` : Détails d'une candidature
 - `PUT /api/candidatures/{id}/` : Modifier une candidature
 - `DELETE /api/candidatures/{id}/` : Supprimer une candidature
+
+#### Contacts et Communication
+- `GET /api/contacts/` : Liste des contacts laboratoires
+- `GET /api/contacts/{id}/` : Détails d'un contact
+- `GET /api/contacts/{id}/horaires/` : Horaires d'un contact
+- `POST /api/messages/` : Envoyer un message de contact
+- `GET /api/messages/` : Liste des messages (admin)
 
 ## 🧩 Serializers (DRF)
 
@@ -357,15 +490,19 @@ Cette section décrit les principaux serializers et ce qu'ils exposent dans les 
 
 ### Interface Admin Django
 Accessible sur `http://localhost:8000/admin/` avec :
-- Gestion complète des chercheurs
-- Configuration des parcours
-- **Nouveau** : Gestion des candidatures avec filtres et recherche
-- Fieldsets organisés pour une navigation optimale
+- **Gestion des Chercheurs** : Profils, diplômes, domaines d'expertise, réseaux sociaux
+- **Gestion des Laboratoires** : Informations, présentations, missions, budgets
+- **Gestion des Parcours** : Formations, spécialisations, conditions d'admission
+- **Gestion de la Recherche** : Projets, publications, citations, réalisations
+- **Candidatures et Formations** : Suivi des candidatures avec filtres et recherche
+- **Partenariats** : Gestion des collaborations et financements
+- **Configuration Système** : Pages, types, et paramètres généraux
+- **Communication** : Messages de contact, horaires, actualités
 
 ### Permissions
-- **Publique** : Consultation des chercheurs et parcours
+- **Publique** : Consultation des chercheurs, parcours, publications, actualités
 - **Candidats** : Soumission de candidatures
-- **Admin** : Gestion complète du système
+- **Admin** : Gestion complète du système avec interface organisée par groupes
 
 ## 🐛 Dépannage
 
@@ -427,6 +564,16 @@ npm run build
 4. Pull Request avec description détaillée
 
 ## 📝 Changelog
+
+### Version 3.0.0 - Système Complet de Gestion
+- ✨ **Nouveau** : Gestion complète des laboratoires et partenariats
+- ✨ **Nouveau** : Système de recherche et publications scientifiques
+- ✨ **Nouveau** : Gestion des contacts et communication
+- ✨ **Nouveau** : Interface admin organisée par groupes fonctionnels
+- ✨ **Nouveau** : Système d'actualités et news
+- 🔧 **Amélioration** : 25+ modèles de données intégrés
+- 🔧 **Amélioration** : API REST étendue avec 6 ViewSets principaux
+- 🔧 **Amélioration** : Interface frontend avec 15 pages complètes
 
 ### Version 2.0.0 - Candidature Dynamique
 - ✨ **Nouveau** : Système de candidature multi-étapes

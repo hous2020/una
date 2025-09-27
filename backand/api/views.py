@@ -158,17 +158,17 @@ class LaboratoireParcourViewSet(viewsets.ReadOnlyModelViewSet):
     
     def get_queryset(self):
         """
-        Filtrage optionnel par laboratoire
+        Filtrage par laboratoire avec ID 1 par défaut
         """
         queryset = super().get_queryset()
         
-        # Filtre par ID de laboratoire
-        laboratoire_id = self.request.query_params.get('laboratoire_id', None)
-        if laboratoire_id is not None:
-            try:
-                queryset = queryset.filter(id_laboratoire=laboratoire_id)
-            except ValueError:
-                pass  # Ignore les valeurs non numériques
+        # Filtre par ID de laboratoire (par défaut: laboratoire ID 1)
+        laboratoire_id = self.request.query_params.get('laboratoire_id', '1')
+        try:
+            queryset = queryset.filter(id_laboratoire=laboratoire_id)
+        except ValueError:
+            # Si la valeur n'est pas valide, on utilise quand même l'ID 1 par défaut
+            queryset = queryset.filter(id_laboratoire=1)
         
         # Filtre par nom de laboratoire
         laboratoire_nom = self.request.query_params.get('laboratoire_nom', None)
@@ -337,33 +337,32 @@ class RecherchePublicationViewSet(viewsets.ReadOnlyModelViewSet):
         if recherche_id and recherche_id.isdigit():
             qs = qs.filter(id_recherche_id=int(recherche_id))
 
-        # Filtre par laboratoire
-        laboratoire_id = self.request.query_params.get('laboratoire_id')
-        if laboratoire_id and laboratoire_id.isdigit():
+        # Filtre par laboratoire (par défaut: laboratoire ID 1)
+        laboratoire_id = self.request.query_params.get('laboratoire_id', '1')
+        try:
             lab_id_int = int(laboratoire_id)
-
-            # A) Recherches liées directement au laboratoire via RechercheLaboratoire
-            recherche_ids_direct = RechercheLaboratoire.objects.filter(
-                id_laboratoire_domaine__id_laboratoire_id=lab_id_int
-            ).values_list('id_recherche_id', flat=True)
-
-            # B) Recherches où des chercheurs du laboratoire participent via RechercheChercheur
-            chercheur_ids = ChercheurPoste.objects.filter(
-                id__in=ChercheurLaboratoire.objects.filter(
-                    id_laboratoire_id=lab_id_int
-                ).values_list('id_chercheur_poste_id', flat=True)
-            ).values_list('id_chercheur_id', flat=True)
-
-            recherche_ids_via_chercheurs = RechercheChercheur.objects.filter(
-                id_chercheur_id__in=chercheur_ids
-            ).values_list('id_recherche_id', flat=True)
-
-            # Union des deux ensembles
-            from django.db.models import Q
-            qs = qs.filter(
-                Q(id_recherche_id__in=recherche_ids_direct) |
-                Q(id_recherche_id__in=recherche_ids_via_chercheurs)
+        except ValueError:
+            lab_id_int = 1  # Valeur par défaut si conversion échoue
+            
+        # Filtre par domaine de laboratoire
+        laboratoire_domaine_id = self.request.query_params.get('laboratoire_domaine_id')
+        
+        # Utilisation prioritaire de RechercheLaboratoire pour le filtrage
+        recherche_filter = RechercheLaboratoire.objects.filter(
+            id_laboratoire_domaine__id_laboratoire_id=lab_id_int
+        )
+        
+        # Ajouter le filtre de domaine si spécifié
+        if laboratoire_domaine_id and laboratoire_domaine_id.isdigit():
+            recherche_filter = recherche_filter.filter(
+                id_laboratoire_domaine_id=int(laboratoire_domaine_id)
             )
+            
+        # Obtenir les IDs de recherche depuis RechercheLaboratoire
+        recherche_ids = recherche_filter.values_list('id_recherche_id', flat=True)
+        
+        # Filtrer les publications par les recherches trouvées
+        qs = qs.filter(id_recherche_id__in=recherche_ids)
 
         # Présence de fichier PDF
         has_pdf = self.request.query_params.get('has_pdf')
@@ -440,11 +439,27 @@ class HoraireLaboratoireViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        
+        # Récupérer les paramètres de requête
         contact_id = self.request.query_params.get('contact_id')
         jour = self.request.query_params.get('jour')
         ouvert_seulement = self.request.query_params.get('ouvert_seulement')
+        laboratoire_id = self.request.query_params.get('laboratoire_id', '1')  # Par défaut laboratoire ID 1
+        
+        # Filtrer par contact_id si spécifié
         if contact_id and contact_id.isdigit():
             qs = qs.filter(contact_laboratoire_id=int(contact_id))
+        else:
+            # Si contact_id n'est pas spécifié, filtrer par laboratoire_id
+            try:
+                lab_id = int(laboratoire_id)
+                # Filtrer les horaires des contacts associés au laboratoire spécifié
+                qs = qs.filter(contact_laboratoire__id_laboratoire_id=lab_id)
+            except ValueError:
+                # En cas d'erreur, utiliser laboratoire ID 1 par défaut
+                qs = qs.filter(contact_laboratoire__id_laboratoire_id=1)
+                
+        # Autres filtres existants
         if jour and jour.isdigit():
             qs = qs.filter(jour_semaine=int(jour))
         if ouvert_seulement in ['1', 'true', 'True']:
